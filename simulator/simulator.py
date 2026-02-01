@@ -2,28 +2,34 @@ import random
 import time
 import requests
 
-API_URL = "http://localhost:5001/data"
+API_URL = "https://digital-twin-motor.onrender.com/ingest"
 
-temp = 45
-vibration = 2.5
-rpm = 1480
-load = 35
+def generate_motor_data():
+    load = random.randint(30, 95)
+    rpm = random.randint(900, 1800)
 
-while True:
-    load += random.randint(-3, 3)
-    load = max(10, min(load, 100))
+    temperature = round(35 + load * 0.5 + random.uniform(-2, 3), 2)
+    vibration = round(0.8 + load * 0.03 + random.uniform(-0.2, 0.3), 2)
 
-    temp += load * 0.03 + random.uniform(-0.4, 0.4)
-    vibration += (temp - 60) * 0.02 + random.uniform(-0.1, 0.1)
+    status = "HEALTHY"
+    if temperature > 85 or vibration > 4:
+        status = "FAILURE_RISK"
 
-    data = {
-        "temperature": round(temp, 2),
-        "vibration": round(vibration, 2),
+    return {
+        "temperature": temperature,
+        "vibration": vibration,
         "rpm": rpm,
         "load": load,
+        "status": status,
         "timestamp": time.time()
     }
 
-    requests.post(API_URL, json=data)
-    print(data)
+while True:
+    data = generate_motor_data()
+    try:
+        requests.post(API_URL, json=data, timeout=5)
+        print("Sent:", data)
+    except Exception as e:
+        print("Error:", e)
+
     time.sleep(2)

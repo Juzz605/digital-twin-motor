@@ -1,35 +1,45 @@
-import random
 import time
+import random
 import requests
 
 API_URL = "https://digital-twin-motor.onrender.com/ingest"
 
-def generate_motor_data():
-    load = random.randint(30, 95)
-    rpm = random.randint(900, 1800)
+RPM = 1480
 
-    temperature = round(35 + load * 0.5 + random.uniform(-2, 3), 2)
-    vibration = round(0.8 + load * 0.03 + random.uniform(-0.2, 0.3), 2)
+# ✅ CONSTANT BASELINES (NEVER MUTATE)
+BASE_TEMP = 60.0          # °C
+BASE_VIBRATION = 1.2      # mm/s
 
-    status = "HEALTHY"
-    if temperature > 85 or vibration > 4:
-        status = "FAILURE_RISK"
-
-    return {
-        "temperature": temperature,
-        "vibration": vibration,
-        "rpm": rpm,
-        "load": load,
-        "status": status,
-        "timestamp": time.time()
-    }
+def clamp(v, min_v, max_v):
+    return max(min_v, min(max_v, v))
 
 while True:
-    data = generate_motor_data()
-    try:
-        requests.post(API_URL, json=data, timeout=5)
-        print("Sent:", data)
-    except Exception as e:
-        print("Error:", e)
+    load = random.randint(20, 80)
 
+    # ✅ Physics-inspired model
+    temperature = (
+        BASE_TEMP
+        + (load * 0.5)          # load → heat
+        + random.uniform(-1.5, 1.5)
+    )
+
+    vibration = (
+        BASE_VIBRATION
+        + (load * 0.03)         # load → vibration
+        + random.uniform(-0.1, 0.1)
+    )
+
+    # ✅ HARD SAFETY LIMITS (MANDATORY)
+    temperature = clamp(temperature, 30, 120)
+    vibration = clamp(vibration, 0, 10)
+
+    data = {
+        "temperature": round(temperature, 2),
+        "vibration": round(vibration, 2),
+        "rpm": RPM,
+        "load": load
+    }
+
+    print(data)
+    requests.post(API_URL, json=data, timeout=5)
     time.sleep(2)

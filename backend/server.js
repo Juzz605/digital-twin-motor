@@ -1,64 +1,83 @@
-import express from "express";
-import mongoose from "mongoose";
-import cors from "cors";
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log("MongoDB connected"))
-  .catch(err => console.error(err));
+mongoose.connect(process.env.MONGODB_URI);
 
 const MotorSchema = new mongoose.Schema({
   temperature: Number,
   vibration: Number,
   rpm: Number,
   load: Number,
-  status: String,
-  timestamp: Number
+  timestamp: { type: Date, default: Date.now },
+  status: String
 });
 
 const Motor = mongoose.model("Motor", MotorSchema);
 
-app.get("/", (req, res) => {
-  res.send("Backend alive");
-});
+const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
-/* Ingest sensor data */
+function healthModel({ temperature, vibration, load }) {
+  let score = 0;
+  if (temperature > 90) score += 2;
+  if (vibration > 6) score += 2;
+  if (load > 85) score += 1;
+
+  if (score >= 4) return "FAILURE_RISK";
+  if (score >= 2) return "WARNING";
+  return "NORMAL";
+}
+
+/* 🔥 INGEST (REAL DATA) */
 app.post("/ingest", async (req, res) => {
-  const data = req.body;
-  await Motor.create(data);
-  res.json({ ok: true });
+  let { temperature, vibration, rpm, load } = req.body;
+
+  temperature = clamp(temperature, 30, 120);
+  vibration = clamp(vibration, 0, 10);
+  load = clamp(load, 0, 100);
+
+  const status = healthModel({ temperature, vibration, load });
+
+  const doc = await Motor.create({
+    temperature,
+    vibration,
+    rpm,
+    load,
+    status
+  });
+
+  res.json(doc);
 });
 
-/* Fetch recent data */
-app.get("/data", async (req, res) => {
-  const data = await Motor.find().sort({ timestamp: -1 }).limit(50);
-  res.json(data.reverse());
-});
+/* 🔮 WHAT-IF SIMULATION */
+app.post("/whatif", (req, res) => {
+  let { load, rpm = 1480 } = req.body;
 
-/* WHAT-IF simulation */
-app.post("/simulate", (req, res) => {
-  const { load, rpm, power } = req.body;
+  load = clamp(load, 0, 100);
 
-  const temperature = 30 + load * 0.6 + power * 0.4;
-  const vibration = 0.7 + load * 0.04 + rpm / 3000;
+  const temperature = clamp(60 + load * 0.6, 30, 120);
+  const vibration = clamp(1.2 + load * 0.04, 0, 10);
 
-  const failureRisk =
-    temperature > 85 || vibration > 4 ? "HIGH" : "LOW";
+  const status = healthModel({ temperature, vibration, load });
 
   res.json({
-    input: { load, rpm, power },
-    predicted: {
-      temperature: Number(temperature.toFixed(2)),
-      vibration: Number(vibration.toFixed(2)),
-      failureRisk
-    }
+    temperature,
+    vibration,
+    rpm,
+    load,
+    status
   });
 });
 
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => {
-  console.log("Backend running on port", PORT);
+/* 📊 DASHBOARD DATA */
+app.get("/data", async (_, res) => {
+  const data = await Motor.find().sort({ timestamp: -1 }).limit(200);
+  res.json(data.reverse());
 });
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log("Backend running on", PORT));

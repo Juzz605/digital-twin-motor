@@ -1,3 +1,4 @@
+console.log("🚀 USING BACKEND/SERVER.JS — MONGO =", process.env.MONGODB_URI);
 const express = require("express")
 const mongoose = require("mongoose")
 const cors = require("cors")
@@ -9,12 +10,12 @@ app.use(express.json())
 /* =======================
    MongoDB Connection
 ======================= */
+console.log("MONGODB_URI=", process.env.MONGODB_URI)
+
 mongoose
-  .connect(
-    "process.env.MONGO_URI"
-  )
+  .connect(process.env.MONGODB_URI)
   .then(() => console.log("MongoDB connected"))
-  .catch(err => console.error(err))
+  .catch(err => console.error("Mongo error:", err.message))
 
 /* =======================
    Schema

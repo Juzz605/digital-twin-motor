@@ -11,7 +11,7 @@ app.use(express.json())
 ======================= */
 mongoose
   .connect(
-    "mongodb+srv://dhananjeyan604_db_user:DHANAJUZZ605@cluster0.eww66pz.mongodb.net/?appName=Cluster0"
+    "process.env.MONGODB_URI"
   )
   .then(() => console.log("MongoDB connected"))
   .catch(err => console.error(err))
@@ -150,7 +150,9 @@ function predictFuture(history, steps = 10) {
 /* =======================
    ROUTES
 ======================= */
-
+app.get("/", (req, res) => {
+  res.send("Digital Twin Backend is running 🚀")
+})
 // Ingest sensor data
 app.post("/data", async (req, res) => {
   try {
